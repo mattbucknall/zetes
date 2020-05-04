@@ -1,2 +1,2 @@
 # zetes
-JSON library for microcontrollers implemented in ANSI C.
+JSON library for resource constrained systems, written in C99.
