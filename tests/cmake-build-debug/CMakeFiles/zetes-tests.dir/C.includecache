@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../../zetes.h
+stdbool.h
+-
+stddef.h
+-
+
+/home/matt/Projects/zetes/tests/zetes-tests.c
+stdio.h
+-
+string.h
+-
+zetes.h
+-
+

@@ -1,0 +1,1 @@
+/usr/bin/cc -Wall -g  -rdynamic CMakeFiles/zetes-tests.dir/zetes-tests.c.o CMakeFiles/zetes-tests.dir/home/matt/Projects/zetes/zetes.c.o  -o zetes-tests 
