@@ -103,7 +103,9 @@ void zetes_cleanup(zetes_t* ctx);
 
 void zetes_reset(zetes_t* ctx);
 
-zetes_result_t zetes_result(zetes_t* ctx);
+zetes_result_t zetes_result(const zetes_t* ctx);
+
+bool zetes_ok(const zetes_t* ctx);
 
 void zetes_push_null(zetes_t* ctx);
 
@@ -147,7 +149,11 @@ void zetes_object_set(zetes_t* ctx, const char* key);
 
 zetes_result_t zetes_write(zetes_t* ctx, zetes_write_func_t write_func, void* user_data);
 
+zetes_result_t zetes_write_buffer(zetes_t* ctx, char* buffer, size_t buffer_size);
+
 zetes_result_t zetes_read(zetes_t* ctx, zetes_read_func_t read_func, void* user_data);
+
+zetes_result_t zetes_read_buffer(zetes_t* ctx, const char* buffer, size_t buffer_size);
 
 
 #ifndef _DOXYGEN

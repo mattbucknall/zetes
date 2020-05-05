@@ -6,17 +6,19 @@
 
 #IncludeRegexTransform: 
 
-../../zetes.h
-stdbool.h
+/home/matt/Projects/zetes/zetes.c
+stdint.h
 -
-stddef.h
--
-
-/home/matt/Projects/zetes/tests/zetes-tests.c
 stdio.h
 -
 string.h
 -
 zetes.h
+/home/matt/Projects/zetes/zetes.h
+
+/home/matt/Projects/zetes/zetes.h
+stdbool.h
+-
+stddef.h
 -
 

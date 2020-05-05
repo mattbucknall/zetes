@@ -28,11 +28,11 @@
  */
 
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "zetes.h"
 
+extern void debug(char c);
 
 typedef enum {
 	TOKEN_TYPE_UNDEFINED,
@@ -66,6 +66,18 @@ typedef struct {
 } rstate_t;
 
 
+typedef struct {
+	char* i;
+	char *e;
+} write_buffer_state_t;
+
+
+typedef struct {
+	const char* i;
+	const char* e;
+} read_buffer_state_t;
+
+
 static const char SYMBOL_KEY_VAL_SEPARATOR[1] = 	{':'};
 static const char SYMBOL_COMMA[1] = 				{','};
 static const char SYMBOL_OBJECT_OPEN[1] = 			{'{'};
@@ -96,8 +108,11 @@ static void* align_ptr(void* ptr) {
 
 
 static void* alloc(zetes_t* ctx, size_t size) {
-	size_t space = ctx->buffer_end - ctx->buffer_ptr;
+	size_t space;
 	void* ptr;
+
+	ctx->buffer_ptr = align_ptr(ctx->buffer_ptr);
+	space = ctx->buffer_end - ctx->buffer_ptr;
 
 	if ( space < size ) {
 		set_error(ctx, ZETES_RESULT_OUT_OF_MEMORY);
@@ -152,11 +167,16 @@ void zetes_reset(zetes_t* ctx) {
 }
 
 
-zetes_result_t zetes_result(zetes_t* ctx) {
+zetes_result_t zetes_result(const zetes_t* ctx) {
 	ZETES_ASSERT(ctx);
 	ZETES_ASSERT(ctx->result != ZETES_RESULT_UNINITIALIZED);
 
 	return ctx->result;
+}
+
+
+bool zetes_ok(const zetes_t* zetes) {
+	return zetes_result(zetes) == ZETES_RESULT_OK;
 }
 
 
@@ -684,11 +704,62 @@ static bool write_bool(wstate_t* state, bool value) {
 }
 
 
-static bool write_number(wstate_t* state, zetes_number_t value) {
-	int len;
+static char* int_to_str(char* buffer_end, int value) {
+	bool neg;
 
-	len = snprintf(state->ctx->temp, ZETES_TEMP_BUFFER_SIZE, "%.9g", value);
-	return write_all(state, state->ctx->temp, len);
+	if ( value < 0 ) {
+		neg = true;
+		value = -value;
+	} else {
+		neg = false;
+	}
+
+	do {
+		*(--buffer_end) = (char)(value % 10) + '0';
+		value /= 10;
+	} while (value > 0);
+
+	if ( neg ) {
+		*(--buffer_end) = '-';
+	}
+
+	return buffer_end;
+}
+
+
+static bool write_number(wstate_t* state, zetes_number_t value) {
+	char buffer[20];
+	char* buffer_i;
+	char* buffer_e = buffer + 20;
+	int int_part = (int) value;
+	int frac_part = (int) (value * 1000000);
+	int divider = 100000;
+
+	buffer_i = int_to_str(buffer_e, (int) value);
+
+	if ( !write_all(state, buffer_i, buffer_e - buffer_i) ) {
+		return false;
+	}
+
+	buffer_i = &buffer[1];
+	buffer_e = buffer_i;
+
+	while (divider > 0) {
+		*buffer_e++ = (char)(((frac_part) / divider) % 10) + '0';
+		divider /= 10;
+	}
+
+	while (buffer_e > buffer_i) {
+		char* c = buffer_e - 1;
+		if ( *c != '0' ) break;
+		buffer_e = c;
+	}
+
+	if ( buffer_e > buffer_i ) {
+		*(--buffer_i) = '.';
+	}
+
+	return write_all(state, buffer_i, buffer_e - buffer_i);
 }
 
 
@@ -941,6 +1012,31 @@ zetes_result_t zetes_write(zetes_t* ctx, zetes_write_func_t write_func, void* us
 }
 
 
+static int write_buffer_func(const void* buffer, int length, void* user_data) {
+	write_buffer_state_t* state = (write_buffer_state_t*) user_data;
+	size_t remaining = state->e - state->i;
+
+	if ( length > remaining ) {
+		return -1;
+	}
+
+	memcpy(state->i, buffer, length);
+	state->i += length;
+
+	return length;
+}
+
+
+zetes_result_t zetes_write_buffer(zetes_t* ctx, char* buffer, size_t buffer_size) {
+	write_buffer_state_t state;
+
+	state.i = buffer;
+	state.e = buffer + buffer_size;
+
+	return zetes_write(ctx, write_buffer_func, &state);
+}
+
+
 static int is_end_of_input(char c)
 {
 	return ( c == '\0' );
@@ -1062,31 +1158,34 @@ static int is_decimal_point(char c)
 
 
 static char next_char(rstate_t* state) {
+	char c;
+
 	if ( state->prev_char ) {
-		char c = state->prev_char;
+		c = state->prev_char;
 		state->prev_char = 0;
-		return c;
-	}
+	} else {
+		if (state->buffer_i >= state->buffer_e) {
+			int n_read;
 
-	if ( state->buffer_i >= state->buffer_e ) {
-		int n_read;
+			n_read = state->read_func(state->ctx->temp, ZETES_TEMP_BUFFER_SIZE, state->user_data);
 
-		n_read = state->read_func(state->ctx->temp, ZETES_TEMP_BUFFER_SIZE, state->user_data);
+			if (n_read < 0) {
+				set_error(state->ctx, ZETES_RESULT_READ_ERROR);
+				return 0;
+			}
 
-		if ( n_read < 0 ) {
-			set_error(state->ctx, ZETES_RESULT_READ_ERROR);
-			return 0;
+			state->buffer_i = state->ctx->temp;
+			state->buffer_e = state->buffer_i + n_read;
+
+			if (n_read == 0) {
+				return 0;
+			}
 		}
 
-		state->buffer_i = state->ctx->temp;
-		state->buffer_e = state->buffer_i + n_read;
-
-		if ( n_read == 0 ) {
-			return 0;
-		}
+		c = *(state->buffer_i++);
 	}
 
-	return *(state->buffer_i++);
+	return c;
 }
 
 
@@ -1533,4 +1632,29 @@ zetes_result_t zetes_read(zetes_t* ctx, zetes_read_func_t read_func, void* user_
 	}
 
 	return ctx->result;
+}
+
+
+static int read_buffer_func(void* buffer, int length, void* user_data) {
+	read_buffer_state_t* state = (read_buffer_state_t*) user_data;
+	size_t remaining = state->e - state->i;
+
+	if ( length > remaining ) {
+		length = remaining;
+	}
+
+	memcpy(buffer, state->i, length);
+	state->i += length;
+
+	return length;
+}
+
+
+zetes_result_t zetes_read_buffer(zetes_t* ctx, const char* buffer, size_t buffer_size) {
+	read_buffer_state_t state;
+
+	state.i = buffer;
+	state.e = buffer + buffer_size;
+
+	return zetes_read(ctx, read_buffer_func, &state);
 }

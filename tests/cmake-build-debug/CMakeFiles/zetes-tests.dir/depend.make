@@ -4,6 +4,5 @@
 CMakeFiles/zetes-tests.dir/home/matt/Projects/zetes/zetes.c.o: /home/matt/Projects/zetes/zetes.c
 CMakeFiles/zetes-tests.dir/home/matt/Projects/zetes/zetes.c.o: /home/matt/Projects/zetes/zetes.h
 
-CMakeFiles/zetes-tests.dir/zetes-tests.c.o: ../../zetes.h
 CMakeFiles/zetes-tests.dir/zetes-tests.c.o: ../zetes-tests.c
 
